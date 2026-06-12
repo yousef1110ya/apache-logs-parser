@@ -18,3 +18,7 @@ class LogEvent:
     path: str | None = None
 
     status_code: int | None = None
+
+    referer: str | None = None
+
+    user_agent: str | None = None
