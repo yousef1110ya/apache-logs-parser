@@ -1,3 +1,4 @@
+import json
 import re
 
 from datetime import datetime
@@ -21,14 +22,18 @@ ACCESS_PATTERN = re.compile(
 )
 
 APACHE_TIMESTAMP_FORMAT = "%d/%b/%Y:%H:%M:%S %z"
+JSON_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 
-def _parse_timestamp(value):
+def _parse_timestamp(value, timestamp_format=APACHE_TIMESTAMP_FORMAT):
+
+    if not value:
+        return None
 
     try:
         return datetime.strptime(
             value,
-            APACHE_TIMESTAMP_FORMAT
+            timestamp_format
         )
     except ValueError:
         return None
@@ -46,13 +51,72 @@ def _parse_request(value):
 
 def _normalize_optional_header(value):
 
-    if value in (None, "-"):
+    if value in (None, "", "-"):
         return None
 
     return value
 
 
+def _parse_status(value):
+
+    try:
+        return int(
+            value
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_json_access(line):
+
+    try:
+        payload = json.loads(
+            line
+        )
+    except json.JSONDecodeError:
+        return None
+
+    path = payload.get(
+        "path"
+    )
+
+    query = payload.get(
+        "query"
+    )
+
+    if query and query != "-":
+        path = f"{path or ''}{query}"
+
+    return LogEvent(
+        source="access",
+        raw_line=line,
+        timestamp=_parse_timestamp(
+            payload.get("timestamp"),
+            JSON_TIMESTAMP_FORMAT
+        ),
+        ip=payload.get("client_ip"),
+        method=payload.get("method"),
+        path=path,
+        status_code=_parse_status(
+            payload.get("status")
+        ),
+        referer=_normalize_optional_header(
+            payload.get("referer")
+        ),
+        user_agent=_normalize_optional_header(
+            payload.get("user_agent")
+        )
+    )
+
+
 def parse_access(line):
+
+    event = _parse_json_access(
+        line
+    )
+
+    if event:
+        return event
 
     match = ACCESS_PATTERN.search(
         line
@@ -76,7 +140,9 @@ def parse_access(line):
         ip=match.group("ip"),
         method=method,
         path=path,
-        status_code=int(status) if status.isdigit() else None,
+        status_code=_parse_status(
+            status
+        ),
         referer=_normalize_optional_header(
             match.group("referer")
         ),

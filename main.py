@@ -1,4 +1,5 @@
 import threading
+import time
 
 from prometheus_client import start_http_server
 
@@ -17,7 +18,11 @@ from core.parser import (
 
 from reader.tail_reader import follow
 
-from metrics.exporter import increment
+from metrics.exporter import (
+    increment,
+    increment_line_processed,
+    increment_parse_failure
+)
 
 
 engine = DetectionEngine()
@@ -29,9 +34,16 @@ def process_access_logs():
         ACCESS_LOG_PATH
     ):
 
+        increment_line_processed(
+            "access"
+        )
+
         event = parse_access(line)
 
         if not event:
+            increment_parse_failure(
+                "access"
+            )
             continue
 
         detections = engine.process(
@@ -51,6 +63,10 @@ def process_error_logs():
         ERROR_LOG_PATH
     ):
 
+        increment_line_processed(
+            "error"
+        )
+
         event = parse_error(line)
 
         detections = engine.process(
@@ -65,6 +81,19 @@ def process_error_logs():
 
 
 if __name__ == "__main__":
+
+    print(
+        "Starting AI classifier metrics server on port",
+        PROMETHEUS_PORT
+    )
+    print(
+        "Watching access log:",
+        ACCESS_LOG_PATH
+    )
+    print(
+        "Watching error log:",
+        ERROR_LOG_PATH
+    )
 
     start_http_server(
         PROMETHEUS_PORT
@@ -81,4 +110,6 @@ if __name__ == "__main__":
     ).start()
 
     while True:
-        pass
+        time.sleep(
+            1
+        )
