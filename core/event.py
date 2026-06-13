@@ -17,8 +17,14 @@ class LogEvent:
 
     path: str | None = None
 
+    query: str | None = None
+
     status_code: int | None = None
 
     referer: str | None = None
 
     user_agent: str | None = None
+
+    headers: dict | None = None
+
+    body: object | None = None

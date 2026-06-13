@@ -37,14 +37,15 @@ Grafana Dashboards
 
 ## Processing Flow
 
-1. Apache writes log entries to:
+1. Apache and the e-commerce app write log entries to:
 
 ```text
 access.log
 error.log
+request-audit.log
 ```
 
-2. The classifier watches both files in real time.
+2. The classifier watches all configured log files in real time.
 
 3. New log entries are parsed into LogEvent objects.
 
@@ -107,7 +108,10 @@ Example:
 event.ip
 event.method
 event.path
+event.query
 event.status_code
+event.headers
+event.body
 event.raw_line
 ```
 
@@ -426,6 +430,27 @@ Detects:
 * DDoS-like traffic patterns
 
 The detector uses a rolling time window and tracks activity per IP address.
+
+## Request Body Audit Logs
+
+The e-commerce app writes sanitized request-body audit events as JSON lines.
+
+Example:
+
+```json
+{
+  "source": "request-audit",
+  "method": "PUT",
+  "path": "/api/users/me",
+  "status": 200,
+  "body": {
+    "name": "<script>alert(1)</script>",
+    "password": "[REDACTED]"
+  }
+}
+```
+
+The classifier parses these events and the suspicious-pattern detector scans URL paths, query strings, headers, request body values, and the raw log line.
 
 ---
 

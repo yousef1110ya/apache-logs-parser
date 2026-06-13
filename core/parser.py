@@ -67,6 +67,22 @@ def _parse_status(value):
         return None
 
 
+def _parse_iso_timestamp(value):
+
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(
+            value.replace(
+                "Z",
+                "+00:00"
+            )
+        )
+    except ValueError:
+        return None
+
+
 def _parse_json_access(line):
 
     try:
@@ -97,6 +113,9 @@ def _parse_json_access(line):
         ip=payload.get("client_ip"),
         method=payload.get("method"),
         path=path,
+        query=_normalize_optional_header(
+            query
+        ),
         status_code=_parse_status(
             payload.get("status")
         ),
@@ -157,4 +176,43 @@ def parse_error(line):
     return LogEvent(
         source="error",
         raw_line=line
+    )
+
+
+def parse_request_audit(line):
+
+    try:
+        payload = json.loads(
+            line
+        )
+    except json.JSONDecodeError:
+        return None
+
+    headers = payload.get(
+        "headers"
+    )
+
+    if not isinstance(headers, dict):
+        headers = None
+
+    return LogEvent(
+        source="request_audit",
+        raw_line=line,
+        timestamp=_parse_iso_timestamp(
+            payload.get("timestamp")
+        ),
+        ip=payload.get("client_ip"),
+        method=payload.get("method"),
+        path=payload.get("path"),
+        query=_normalize_optional_header(
+            payload.get("query")
+        ),
+        status_code=_parse_status(
+            payload.get("status")
+        ),
+        user_agent=_normalize_optional_header(
+            payload.get("user_agent")
+        ),
+        headers=headers,
+        body=payload.get("body")
     )

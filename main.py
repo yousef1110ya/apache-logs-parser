@@ -6,6 +6,7 @@ from prometheus_client import start_http_server
 from config.settings import (
     ACCESS_LOG_PATH,
     ERROR_LOG_PATH,
+    REQUEST_AUDIT_LOG_PATH,
     PROMETHEUS_PORT
 )
 
@@ -13,7 +14,8 @@ from core.engine import DetectionEngine
 
 from core.parser import (
     parse_access,
-    parse_error
+    parse_error,
+    parse_request_audit
 )
 
 from reader.tail_reader import follow
@@ -80,6 +82,35 @@ def process_error_logs():
             )
 
 
+def process_request_audit_logs():
+
+    for line in follow(
+        REQUEST_AUDIT_LOG_PATH
+    ):
+
+        increment_line_processed(
+            "request_audit"
+        )
+
+        event = parse_request_audit(line)
+
+        if not event:
+            increment_parse_failure(
+                "request_audit"
+            )
+            continue
+
+        detections = engine.process(
+            event
+        )
+
+        for detection in detections:
+
+            increment(
+                detection
+            )
+
+
 if __name__ == "__main__":
 
     print(
@@ -94,6 +125,10 @@ if __name__ == "__main__":
         "Watching error log:",
         ERROR_LOG_PATH
     )
+    print(
+        "Watching request audit log:",
+        REQUEST_AUDIT_LOG_PATH
+    )
 
     start_http_server(
         PROMETHEUS_PORT
@@ -106,6 +141,11 @@ if __name__ == "__main__":
 
     threading.Thread(
         target=process_error_logs,
+        daemon=True
+    ).start()
+
+    threading.Thread(
+        target=process_request_audit_logs,
         daemon=True
     ).start()
 

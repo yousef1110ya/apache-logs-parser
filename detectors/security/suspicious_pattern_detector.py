@@ -74,6 +74,13 @@ class SuspiciousPatternDetector(BaseDetector):
             value
             for value in [
                 event.path,
+                event.query,
+                self._flatten(
+                    event.headers
+                ),
+                self._flatten(
+                    event.body
+                ),
                 event.raw_line
             ]
             if value
@@ -82,4 +89,31 @@ class SuspiciousPatternDetector(BaseDetector):
         return unquote_plus(
             text
         ).lower()
+
+    def _flatten(self, value):
+
+        if value is None:
+            return ""
+
+        if isinstance(
+            value,
+            dict
+        ):
+            return " ".join(
+                f"{key} {self._flatten(item)}"
+                for key, item in value.items()
+            )
+
+        if isinstance(
+            value,
+            list
+        ):
+            return " ".join(
+                self._flatten(item)
+                for item in value
+            )
+
+        return str(
+            value
+        )
 
